@@ -1,0 +1,239 @@
+\section{Motivation}
+Earth navigation is a fundamental problem for autonomous systems. The guidance, navigation and control system of an autonomous system needs to track a trajectory to be followed by the vehicle, position the vehicle with respect to it, and control the resulting errors. The algorithms typically used to compute the relative navigation errors and controlling them are typically based on a flat earth assumption, however airborne and seaborne autonomous vehicle typically cover distances large enough that the flat earth approximation starts to fall apart. This disconnect arises from the complexity in the classical implementation of spherical trigonometry. Classical spherical trigonometry applies complex trigonometric formulas inherited from the age of tall ships. These classic set of spherical trigonometry problems, typically the direct and inverse navigation problems, is insufficient for the needs of the autonomous system engineer, and the spherical trigonometry approach is hard to approach and extend. This typically leads to both spherical earth navigation being used for trajectory generation, and then discretizing the resulting trajectory into sections small enough that the flat earth approximation leads to acceptable results.
+
+Leveraging the uniquity of vector calculus , this text offers a reinterpretation of the spherical trigonometry using vector calculus in a way that is more intuitive and workable for the modern engineer. This will be used to solve the classical spherical navigation problems but also extend it to work many of the problems that arise in autonomous systems. The goal is to offer an approach to spherical trigonometry that allows solving the navigation problems at a local and large scale at the same time.
+
+\section{A structured approach to definining the navigation problems}
+
+A structured approach is proposed for the definition of navigation problems. This structured approach identifies a collection of operators and data types involved in them.
+
+These operators, have clearly defined inputs and outputs, and any dependency on parameters is identified. The relations between data types are therefore fixed independently of the exact algorithm to be used.
+
+\textit{Example: we can for example consider the direct navigation problem as a single operator. Given an initial course and distance with respect to an initial point, another point is returned. The operator then would described as:}
+
+\begin{equation}
+    \vec{u}_2 = \text{direct} (\vec{u}_1, \ d, \ \alpha_{12})
+\end{equation}
+
+Operators may be composed to define more complex operators. The operators can be interpreted as user interface and are independent of the underlying implementation. The engineer can work with the existing operators to define new operators and solve new problems.
+
+\section{Definitions and nomenclature}
+
+\subsection{General definitions}
+\begin{tabularx}{\linewidth}{|X|c|X|}
+    \hline
+    Variable  & Symbol & Definition \\
+    \hline
+    Vector position & $\vec{u}$ & A position on the great circle defined as a vector. The vector is assumed to be unitary, thus the $u$ symbol used. \\
+    Latitude & $\varphi$ & \\
+    Longitude & $\lambda$ & \\
+    Great circle distance & $\theta$ & The great circle distance is  the angle between two points as measured from the center of the sphere. \\
+    Azimuth or bearing & $\alpha$ & An angle with respect to the true north at a certain point constrained to the plane tangent to the sphere. \\
+    Great circle normal & $\vec{n}$ & A great circle is defined by the vector normal to its plane. The vector is assumed to be unitary. \\
+    \hline
+\end{tabularx}
+
+\subsection{Notation}
+\begin{itemize}
+	\item Relative variables: we will use the nomenclature $x_{12}$ to represent variables between points, this will typically imply we looking at the variable $x$ considering $1$ as the initial point and $2$ as the final point. E.g. $\theta_{12}$ will be the distance between $1$ and $2$ starting at $1$ and ending at $2$.
+    \item Difference variables: We wll extend the relative variable differences when the operation between the two variables is simply their difference. For example, we can talk about latitude and longitudedifferences as follows:
+        \begin{align}
+            \Delta \varphi_{12} = \varphi_2 - \varphi_1 \\
+            \Delta \lambda_{12} = \lambda_2 - \lambda_1
+        \end{align}
+    \item Latitude and longitude pairs: a position can be defined a latitude and longitude pair $(\varphi, \lambda)$.
+    \item Azimuth on a great circle: we will use $\alpha_{12}$ to represent the azimuth at $(\varphi_1, \lambda_1)$ pointing to the point $(\varphi_2, \lambda_2)$ along a great circle.
+\end{itemize}
+
+\section{The navigation operators}
+
+\subsection{Internal operators}
+The following operators are intended to be used internally by the navigation algorithms, but the engineer should never use them directly.
+
+\subsubsection{Latitude and longitude to vector position}
+Compute the vector position give a latitude and longitude pair. This is the conversion from spherical coordinates to cartesian coordinates.
+\begin{equation}
+    \vec{u} = \vec{u} (\varphi, \ \lambda) =
+    \left[
+        \begin{matrix}
+            \cos \varphi \cos \lambda \\
+            \cos \varphi \sin \lambda \\
+            \sin \varphi
+    \end{matrix}\right]
+\end{equation}
+
+\subsubsection{Vector position to latitude and longitude}
+Compute the latitude and longitude pair given a vector position. This is the conversion from cartesian coordinates to spherical coordinates.
+\begin{equation}
+    (\varphi, \ \lambda) = \vec{u} (\vec{u}) =
+    \left(
+        \text{acos} (\vec{u}_z), \
+        \text{atan2} (\vec{u}_y, \ \vec{u}_x)
+    \right)
+\end{equation}
+
+\subsubsection{Vector normalization}
+The following operator normalizes a vector.
+\begin{equation}
+    \vec{u} = \text{1} (\vec{u}) = \frac{\vec{u}}{\|\vec{u}\|}
+\end{equation}
+
+\subsubsection{Great circle containing two points}
+The great circle is defined by the vector normal to the plane containing the two points. This is the key insight to being working with spherical trigonometry using vector calculus.
+\begin{equation}
+    \vec{n} = \vec{n} (\vec{u}_1, \ \vec{u}_2) = 1\left( \vec{u}_1 \times \vec{u}_2 \right)
+\end{equation}
+Where the sign of $n$ denotes the direction of the great circle.
+
+Note this operator is not well defined when the two points are identical or perfectly opposed. This must be taken care of in the implementation.
+
+\textbf{{Proof:}}
+The cross product returns a vector perpendicular to both points, and the great circle is the plane containing both points and crossing the origin.
+
+\subsubsection{Vector tangency condition to the sphere at a point}
+Given a position vector $\vec{u}$, a vector $\vec{v}$ is tangent to the sphere at this point if it is orthogonal to $\vec{u}$. This is:
+\begin{equation}
+    \vec{v} \cdot \vec{u} = 0
+\end{equation}
+
+\subsubsection{Tangent local frame at a point}
+Given a position vector $\vec{u}$, the local frame at a point expressed as ENU coordinates can be expressed as:
+\begin{equation}
+    \vec{e}_{NED} = \vec{e}_{NED} (\vec{u}) =
+    \left[
+        \begin{matrix}
+            \vec{e}_N \\
+            \vec{e}_E \\
+            \vec{e}_D \\
+    \end{matrix}\right] \\
+    \left[
+        \begin{matrix}            
+            \vec{u} \times \vec{e}_E \\
+			\vec{u} \times \vec{k} \\
+            -\vec{u}
+    \end{matrix}\right]
+\end{equation}
+Where $k$ represents the unitary vector in the vertical direction, i.e. pointing to the north pole.
+
+\subsubsection{Azimuth of a vector tangent to the sphere at a point}
+Given a position vector $\vec{u}$, and a tangent vector $\vec{v}$, the azimuth of $\vec{v}$ with respect to the true north can be found by ensuring the tangency condition and checking the angle with respect to the tangent local frame:
+\begin{equation}
+	\alpha = \alpha (\vec{v}, \ \vec{u}) = \text{atan2} (\vec{v} \cdot \vec{e}_E(\vec{u}), \ \vec{v} \cdot \vec{e}_N(\vec{u}))
+\end{equation}
+
+\subsubsection{Azimuth vector: vector tangent to the sphere at a point with a given azimuth}
+Given a position vector $\vec{u}$, and an azimuth $\alpha$, the azimuth vector $\vec{v}$ can be found by projecting on the local ENU frame:
+\begin{equation}
+	\vec{v} = \vec{v} (\vec{u}, \ \alpha) = \cos \alpha \vec{e}_N(\vec{u})  + \sin \alpha \vec{e}_E(\vec{u}) 
+\end{equation}
+
+\subsubsection{Azimuth vector of a great circle connecting two points at the initial point}
+In here we define the azimuth vector $\vec{v}$ as the vector tangent to the sphere that points in the direction of the great circle connecting two points at the initial point. This is:
+\begin{equation}
+	\vec{v}_{12} = \vec{v}_{12} (\vec{u}_1, \ \vec{u}_2) = n(\vec{u}_1, \ \vec{u}_2) \times \vec{u}_1
+\end{equation}
+
+\textbf{{Proof:}}
+The azimuth vector is orthogonal to the initial point, i.e. it is tangent to the sphere at that point, and it is also contained in the great circle, and thus orthogonal to the great circle normal.
+
+
+\subsubsection{Great circle given a point and an azimuth}
+The great circle can be defined given a point $u_1$and an azimuth $\alpha$. We do so by computing the vector normal to the position and azimuth vector:
+\begin{equation}
+	\vec{n} = \vec{n} (\vec{u}, \ \alpha) = \vec{u} \times \vec{v} (\vec{u}, \ \alpha)
+\end{equation}
+
+Note this operator $\vec{n}$ is overloaded since it was already defined to compute the great circle going through two points, but they can be told apart based on the inputs.
+
+\subsubsection{Rotation of a point given an axis an angle}
+The Rodrigues' rotation formula can be used to rotate a point $u$ given an axis $a$ and an angle $\theta$. This is:
+\begin{equation}
+	\vec{u}_2 = R(\vec{u}_1, \ \vec{a}, \ \theta) = \vec{u}_1 + \sin \theta (\vec{a} \times \vec{u}_1) + (1 - \cos \theta) (\vec{a} \times (\vec{a} \times \vec{u}_1))
+\end{equation}
+
+\subsection{Absolute navigation operators}
+The following operators are intended to be used by the engineer to solve the absolute navigation problems, i.e. the direct and inverse navigation problems. From here on, we will use interchangeably a longitude and latitude pair and a position vector. For notation convenience we will typically refer to point a poin as $\vec{u}$ even if it will typically be handled as a latitude and longitude pair $(\varphi, \lambda)$ by the user.
+
+\subsubsection{Distance between two points}
+The distance or the angle $\theta$ between two points $\vec{u}_1$ and $\vec{u}_2$ can be computed along the great circle as:
+\begin{equation}
+    \theta_{12} = \theta_{12} (\vec{u}_1, \ \vec{u}_2) = \text{asin} (\|\vec{u}_1 \times \vec{u}_2\|)
+\end{equation}
+
+Note that $\theta_{12}=\theta_{21}$ so we will typically refer to it simply as $\theta$ when the inputs are clearly defined.
+
+\textbf{{Proof:}}
+This follows directly from the definition of the cross product:
+\begin{equation}
+    \theta = \text{asin} (\vec{u}_1 \times \vec{u}_2) = \text{acos} (\|\vec{u}_1 \| \|\vec{u}_2 \| \sin \theta)
+\end{equation}
+
+\textbf{{Implementation choice:}}
+An alternative implementation would be to compute the distance using the dot product. However, typically we will want a good precision for nearby points. By using the cross product we compute the arcsine of a small angle for nearby angles which is more procise than computing the arccosine of that angle.
+
+TODO: check this through numerical experiments.
+
+\subsubsection{Azimuth of the great circle between two points at the initial point}
+The azimuth $\alpha_{12}$ at the point $\vec{u}_1$ of the great circle connecting two points $\vec{u}_1$ and $\vec{u}_2$ can be computed composing many of the previously defined operators:
+\begin{equation}
+	\alpha_{12} = \alpha_{12} (\vec{u}_1, \ \vec{u}_2) = \alpha (\vec{v}_{12} (\vec{u}_1, \ \vec{u}_2), \ \vec{u})
+\end{equation}
+
+Note we've simply reused past operators here. The structured approach allows us to compose operators in a way that makes sense to the user and simplify the implementation.
+
+\subsubsection{Inverse navigation problem}
+The inverse navigation is to compute the distance and azimuth given an initial point and a final point. The azimuth is given with respect to the true north at the initial point.
+\begin{equation}
+    (\theta, \ \alpha_{12}) = \text{inverse} (\vec{u}_1, \ \vec{u}_2) = \left(\theta_{12} (\vec{u}_1, \ \vec{u}_2), \ \alpha_{12} (\vec{u}_1, \ \vec{u}_2) \right)
+\end{equation}
+
+\subsubsection{Direct navigation}
+The direct navigation problem is to compute the final point $\vec{u}_2$ given an initial point $\vec{u}_1$, the distance $\theta$, and the azimuth $\alpha_{12}$. 
+\begin{equation}
+    \vec{u}_2 = \text{direct} (\vec{u}_1, \ \theta, \ \alpha_{12}) = 
+	R(\vec{u}_1, \ \vec{n} (\vec{u}_1, \ \alpha_{12}), \ \theta)
+\end{equation}
+
+\subsection{Leg navigation operators}
+The relative navigation problems are to position a point $\vec{u}_t$ relative to a navigation leg. A navigation leg is defined as the great circle $\vec{n}$ connecting two points $\vec{u}_1$ and $\vec{u}_2$. We want to be able to along and cross track deviations and their rates with respect to the leg which.
+
+\subsection{Cross track distance}
+The cross track distance is the distance between the point $\vec{u}_t$ and the great circle $\vec{n}$.
+
+It can be found by projecting the point $\vec{u}_t$ on the great circle normal vector:
+\begin{equation}
+	y = y(\vec{u}, \vec{n}) = \text{acos} (\vec{u} \cdot \vec{n})
+\end{equation}
+
+\textbf{{Implementation choice:}}
+The crosstrack with respect to the great circle needs to be accurate for points close to the great circle. By computing it using the dot product we compute the arccosine of a two close to orthogonal vectors which is more precise than computing the arcsine of that angle.
+
+\subsubsection{Along track distance}
+Two possible definitions of the along track distance, depending on where the reference point is considered:
+\begin{enumerate}
+	\item The distance between the point $\vec{u}_t$ and the point $\vec{u}_1$ after projecting $\vec{u}_t$ onto the great circle.
+	\item The distance between the point $\vec{u}_t$ and the great circle through $\vec{u}_1$ and orthogonal to $\vec{n}$.
+\end{enumerate}
+
+The second one is chosen because it is kinematically consistent with the velocity of the point $\vec{u}_t$. If we consider the point $\vec{u}_1$ to be far from the great circle, then the velocity of the point projected onto the great circle may be different as the velocity of the point $\vec{u}_t$.
+
+TODO: provide formula
+
+\subsubsection{Leg reference frame}
+The leg reference frame is a frame with its origin at $\vec{u}_t$, its $x$ axis aligned such that motion along the axis modifies only along track deviation and its $y$ axis aligned such that motion along the axis modifies only cross track deviation. The $z$ axis is aligned with the great circle normal vector.
+
+\begin{equation}
+    \vec{e}_{XYD} = \vec{e}_{XYD} (\vec{u}_t) =
+    \left[
+        \begin{matrix}
+            \vec{e}_X \\
+            \vec{e}_Y \\
+            \vec{e}_D \\
+    \end{matrix}\right] \\
+    \left[
+        \begin{matrix}            
+            \vec{u} \times \vec{e}_E \\
+			\vec{u} \times \vec{k} \\
+            -\vec{u}
+    \end{matrix}\right]
+\end{equation}
